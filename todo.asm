@@ -32,8 +32,8 @@ main:
     jl .fatal_error
 
     funcall2 write_cstr, STDOUT, bind_trace_msg
-    mov word [servaddr.sin_family], AF_INET
-    mov word [servaddr.sin_port], 14619
+    mov word [servaddr.sin_family], AF_INET    
+    mov word [servaddr.sin_port], 47627
     mov dword [servaddr.sin_addr], INADDR_ANY
     bind [sockfd], servaddr.sin_family, sizeof_servaddr
     cmp rax, 0
@@ -76,9 +76,12 @@ main:
     sub [request_len], get_len
 
     funcall4 starts_with, [request_cur], [request_len], index_route, index_route_len
-    call starts_with
     cmp rax, 0
     jg .serve_index_page
+
+    funcall4 starts_with, [request_cur], [request_len], meteo_route, meteo_route_len
+    cmp rax, 0
+    jg .serve_meteo_page  ; Jump to the new handler if the route matches
 
     jmp .serve_error_404
 
@@ -120,6 +123,14 @@ main:
     funcall2 write_cstr, [connfd], index_page_header
     call render_todos_as_html
     funcall2 write_cstr, [connfd], index_page_footer
+    close [connfd]
+    jmp .next_request
+
+.serve_meteo_page:
+    funcall2 write_cstr, [connfd], meteo_page_response
+    funcall2 write_cstr, [connfd], meteo_page_header
+    call render_todos_as_html
+    funcall2 write_cstr, [connfd], meteo_page_footer
     close [connfd]
     jmp .next_request
 
@@ -401,6 +412,32 @@ index_page_footer    db "  <li>", 10
                      db "<form method='post' action='/shutdown'>", 10
                      db "    <input type='submit' value='shutdown'>", 10
                      db "</form>", 10
+                     db "<a href='/meteo'>meteo Page</a>", 10
+                     db 0
+meteo_page_response  db "HTTP/1.1 200 OK", 13, 10
+                     db "Content-Type: text/html; charset=utf-8", 13, 10
+                     db "Connection: close", 13, 10
+                     db 13, 10
+                     db 0
+test_page_header     db "<h1>Meteo page</h1>", 10
+                     db "<div class='container'>", 10
+                     db "  <form onsubmit='getMeteo(); return false;'>", 10
+                     db "    <input type='text' name='ville' placeholder='Ville...'>", 10
+                     db "    <input type='submit' value='Météo'>", 10
+                     db "  </form>", 10
+                     db "  <div id='meteo'></div>", 10
+                     db "</div>", 10
+                     db "<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>", 10
+                     db "<script>", 10
+                     db "function getMeteo() {", 10
+                     db "  var ville = $('input[name=ville]').val();", 10
+                     db "  $.get('https://api.openweathermap.org/data/2.5/weather?q=' + ville + '&appid=66bb8eed95ce71a17230f561a7be99a5&units=metric', function(data) {", 10
+                     db "    $('#meteo').html('Il fait ' + data.main.temp + '°C à ' + data.name + '.');", 10
+                     db "  });", 10
+                     db "}", 10
+                     db "</script>", 10
+                     db 0
+meteo_page_footer     db "<a href='/'>Back to Home</a>", 10
                      db 0
 todo_header          db "  <li>"
                      db 0
@@ -434,6 +471,9 @@ index_route_len = $ - index_route
 
 shutdown_route db "/shutdown "
 shutdown_route_len = $ - shutdown_route
+
+meteo_route db "/meteo "
+meteo_route_len = $ - meteo_route
 
 start            db "INFO: Starting Web Server!", 10, 0
 ok_msg           db "INFO: OK!", 10, 0
