@@ -32,8 +32,19 @@ main:
     jl .fatal_error
 
     funcall2 write_cstr, STDOUT, bind_trace_msg
-    mov word [servaddr.sin_family], AF_INET    
-    mov word [servaddr.sin_port], 47627
+    mov word [servaddr.sin_family], AF_INET
+
+    mov ax, 3002    ; | 0000 1011 1011 1010 | ------> AX
+                    ; |           1011 1010 | ------> AL
+                    ; | 0000 1011           | ------> AH
+                    ; ax = 0x0BBA = 3002
+
+    xchg al, ah     ; | 1011 1010 0000 1011 | ------> AX
+                    ; |           0000 1011 | ------> AL
+                    ; | 1011 1010           | ------> AH
+                    ; ax = 0xBA0B = 47627
+                    
+    mov [servaddr.sin_port], ax
     mov dword [servaddr.sin_addr], INADDR_ANY
     bind [sockfd], servaddr.sin_family, sizeof_servaddr
     cmp rax, 0
@@ -419,7 +430,7 @@ meteo_page_response  db "HTTP/1.1 200 OK", 13, 10
                      db "Connection: close", 13, 10
                      db 13, 10
                      db 0
-test_page_header     db "<h1>Meteo page</h1>", 10
+meteo_page_header    db "<h1>Meteo page</h1>", 10
                      db "<div class='container'>", 10
                      db "  <form onsubmit='getMeteo(); return false;'>", 10
                      db "    <input type='text' name='ville' placeholder='Ville...'>", 10
